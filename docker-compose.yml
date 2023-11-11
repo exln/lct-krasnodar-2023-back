@@ -1,0 +1,47 @@
+version: "3.9"
+
+networks:
+  dev:
+    driver: bridge
+
+services:
+  db:
+    image: postgres:latest
+    container_name: lct-db
+    restart: always
+    ports:
+      - "5433:5432"
+    networks:
+      - dev
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=lct
+    volumes:
+      - lct-db-data:/var/lib/postgresql/data
+      - ./LctKrasnodarWebApi/DbScripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  
+  backend:
+    container_name: lct-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    networks:
+      - dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      ConnectionStrings__DefaultConnection: "User ID=postgres;Password=postgres;Server=lct-db;Port=5432;Database=lct;IntegratedSecurity=true;Pooling=true;"
+      ASPNETCORE_URLS: http://+:80
+      ASPNETCORE_ENVIRONMENT: "Development"
+  
+volumes:
+  lct-db-data:
